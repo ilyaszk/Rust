@@ -4,10 +4,12 @@ struct Livre {
     num_isbn : String,
     date_publication : String,
 }
+
 impl Livre {
     fn new(titre: &str, auteur: &str, num_isbn: &str, date_publication: &str) -> Livre {
         Livre {
-            titre: titre.into(),//on utilise la méthode into() pour convertir une chaîne de caractères en String
+            titre: titre.into(),
+            //on utilise la méthode into() pour convertir une chaîne de caractères en String
             auteur: auteur.into(),
             num_isbn: num_isbn.into(),
             date_publication: date_publication.into(),
@@ -48,7 +50,7 @@ impl Bibliotheque {
         self.livres.retain(|livre| livre.titre != titre);
     }
 
-    fn saisirUnLivre(&mut self) {
+    fn saisir_un_livre(&mut self) {
         
         println!("Titre du livre :");
         let mut titre = String::new();
@@ -62,9 +64,16 @@ impl Bibliotheque {
         let mut num_isbn = String::new();
         std::io::stdin().read_line(&mut num_isbn).expect("Erreur de lecture");
 
-        println!("Date de publication du livre :");
+        println!("Date de publication du livre au format YYYY :");
         let mut date_publication = String::new();
         std::io::stdin().read_line(&mut date_publication).expect("Erreur de lecture");
+        
+        while date_publication.trim().len() != 4 || !date_publication.trim().chars().all(|c| c.is_digit(10)) {
+            println!("La date doit être composée de 4 chiffres (YYYY). Veuillez réessayer :");
+            date_publication.clear();
+            std::io::stdin().read_line(&mut date_publication).expect("Erreur de lecture");
+        }
+        
 
         let livre = Livre::new(titre.trim(), auteur.trim(), num_isbn.trim(), date_publication.trim());
         
@@ -96,7 +105,7 @@ fn main() {
 
         match choix.trim() {
             "1" => {
-                bibliotheque.saisirUnLivre();
+                bibliotheque.saisir_un_livre();
             },
             "2" => {
                 println!("Titre du livre à rechercher :");
