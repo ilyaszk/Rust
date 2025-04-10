@@ -1,4 +1,7 @@
 use rand::Rng;
+use std::fs::{File, OpenOptions};
+use std::io::{self, Read, Write};
+use std::path::Path;
 use uuid::Uuid;
 
 #[derive(Debug, PartialEq, Clone, Copy)]
@@ -47,18 +50,15 @@ impl Pokemon {
     }
 
     fn afficher(&self) {
-        println!("##############################");
-        println!("Pokémon");
         println!("=========================");
+        println!("Pokémon  ===>");
         println!("ID: {}", self.id);
         println!("Nom: {}", self.nom);
         println!("Niveau: {}", self.niveau);
         println!("Type: {:?}", self.type_pokemon);
         println!("Experience: {}", self.experience);
         println!("Genre: {:?}", self.genre);
-        println!("----------------------");
-        println!("##############################");
-        println!("##############################");
+        println!("=========================");
     }
 }
 
@@ -102,41 +102,166 @@ impl PokeDeck {
             return;
         }
 
+        // Générer aléatoirement le genre
         let genre_aleatoire = if rand::thread_rng().gen_bool(0.5) {
             Genre::Male
         } else {
             Genre::Femelle
         };
 
-        let new_poke = Pokemon::new("????".to_string(), poke1.type_pokemon, genre_aleatoire);
+        // Générer aléatoirement le nom
+        let noms = [
+            "Pikachu", "Bulbizarre", "Salamèche", "Carapuce", 
+            "Évoli", "Miaous", "Rondoudou", "Psykokwak",
+            "Rattata", "Miaouss", "Goupix", "Nosferapti"
+        ];
+        let nom_aleatoire = noms[rand::thread_rng().gen_range(0..noms.len())].to_string();
+
+        let new_poke = Pokemon::new(nom_aleatoire, poke1.type_pokemon, genre_aleatoire);
         println!("Un nouveau Pokémon est né !!!");
         new_poke.afficher();
         self.ajouter_pokemon(new_poke);
     }
+
+    // Nouvelles fonctionnalités pour trier les Pokémon
+    fn trier_par_niveau(&mut self) {
+        self.pokemons.sort_by(|a, b| b.niveau.cmp(&a.niveau));
+    }
+
+    fn trier_par_type(&mut self) {
+        self.pokemons.sort_by(|a, b| {
+            let type_a = format!("{:?}", a.type_pokemon);
+            let type_b = format!("{:?}", b.type_pokemon);
+            type_a.cmp(&type_b)
+        });
+    }
+    
+    // Sauvegarder les Pokémon dans un fichier
+    fn sauvegarder(&self, fichier: &str) -> io::Result<()> {
+        let mut file = OpenOptions::new()
+            .write(true)
+            .create(true)
+            .truncate(true)
+            .open(fichier)?;
+
+        writeln!(file, "ID,Nom,Niveau,Type,Experience,Genre")?;
+        
+        for pokemon in &self.pokemons {
+            writeln!(
+                file,
+                "{},{},{},{:?},{},{:?}",
+                pokemon.id,
+                pokemon.nom,
+                pokemon.niveau,
+                pokemon.type_pokemon,
+                pokemon.experience,
+                pokemon.genre
+            )?;
+        }
+        
+        println!("Pokédex sauvegardé dans le fichier: {}", fichier);
+        Ok(())
+    }
+    
+    // Charger les Pokémon depuis un fichier
+    fn charger(&mut self, fichier: &str) -> io::Result<()> {
+        if !Path::new(fichier).exists() {
+            println!("Le fichier {} n'existe pas.", fichier);
+            return Ok(());
+        }
+
+        if self.pokemons.len() > 0 {
+            println!("Le Pokédex n'est pas vide. Veuillez le vider avant de charger un nouveau fichier.");
+            return Ok(());
+        }
+        
+        let mut file = File::open(fichier)?;
+        let mut contenu = String::new();
+        file.read_to_string(&mut contenu)?;
+        
+        let mut lignes = contenu.lines();
+        
+        // Ignorer l'en-tête
+        if let Some(_) = lignes.next() {
+            for ligne in lignes {
+                let parts: Vec<&str> = ligne.split(',').collect();
+                if parts.len() == 6 {
+                    let id = Uuid::parse_str(parts[0]).unwrap_or_else(|_| Uuid::new_v4());
+                    let nom = parts[1].to_string();
+                    let niveau = parts[2].parse::<u32>().unwrap_or(1);
+                    
+                    let type_pokemon = match parts[3] {
+                        "Feu" => TypePokemon::Feu,
+                        "Eau" => TypePokemon::Eau,
+                        "Plante" => TypePokemon::Plante,
+                        "Electrik" => TypePokemon::Electrik,
+                        "Tenebre" => TypePokemon::Tenebre,
+                        _ => TypePokemon::Feu,
+                    };
+                    
+                    let experience = parts[4].parse::<u32>().unwrap_or(0);
+                    
+                    let genre = match parts[5] {
+                        "Male" => Genre::Male,
+                        "Femelle" => Genre::Femelle,
+                        _ => Genre::Male,
+                    };
+                    
+                    let pokemon = Pokemon {
+                        id,
+                        nom,
+                        niveau,
+                        type_pokemon,
+                        experience,
+                        genre,
+                    };
+                    
+                    self.pokemons.push(pokemon);
+                }
+            }
+        }
+        
+        println!("{} Pokémon chargés depuis le fichier: {}", self.pokemons.len(), fichier);
+        Ok(())
+    }
 }
 
-
-
 fn afficher_menu() {
-    println!("Choisissez une option :");
+    println!("\nPokémon Manager - Menu Principal");
+    println!("=================================");
     println!("1. Ajouter un Pokémon");
     println!("2. Afficher les Pokémon");
     println!("3. Entraîner les Pokémon");
     println!("4. Reproduire des Pokémon");
-    println!("5. Quitter");
+    println!("5. Trier les Pokémon par niveau");
+    println!("6. Trier les Pokémon par type");
+    println!("7. Sauvegarder les Pokémon");
+    println!("8. Charger les Pokémon");
+    println!("9. Quitter");
+    print!("Votre choix: ");
+    io::stdout().flush().unwrap();
 }
 
 fn saisie_pokemon() -> Option<Pokemon> {
-    use std::io::{self, Write};
-
-    println!("Menu de saisie d'un Pokémon :");
+    println!("\nMenu de saisie d'un Pokémon :");
     println!("=========================");
 
-    print!("==> Nom du Pokémon : ");
+    print!("==> Nom du Pokémon (ou 'aléatoire' pour un nom aléatoire): ");
     io::stdout().flush().unwrap();
     let mut nom = String::new();
     io::stdin().read_line(&mut nom).expect("Erreur de lecture");
     let nom = nom.trim().to_string();
+
+    let nom_final = if nom.to_lowercase() == "aléatoire" || nom.to_lowercase() == "aleatoire" {
+        let noms = [
+            "Pikachu", "Bulbizarre", "Salamèche", "Carapuce", 
+            "Évoli", "Miaous", "Rondoudou", "Psykokwak",
+            "Rattata", "Miaouss", "Goupix", "Nosferapti"
+        ];
+        noms[rand::thread_rng().gen_range(0..noms.len())].to_string()
+    } else {
+        nom
+    };
 
     println!("==> Type du Pokémon :");
     println!("1. Feu");
@@ -162,19 +287,21 @@ fn saisie_pokemon() -> Option<Pokemon> {
     println!("==> Genre du Pokémon :");
     println!("1. Male");
     println!("2. Femelle");
+    println!("3. Aléatoire");
 
     let mut genre_input = String::new();
     io::stdin().read_line(&mut genre_input).expect("Erreur de lecture");
     let genre = match genre_input.trim() {
         "1" => Genre::Male,
         "2" => Genre::Femelle,
+        "3" => if rand::thread_rng().gen_bool(0.5) { Genre::Male } else { Genre::Femelle },
         _ => {
             println!("Genre invalide !");
             return None;
         }
     };
 
-    Some(Pokemon::new(nom, type_pokemon, genre))
+    Some(Pokemon::new(nom_final, type_pokemon, genre))
 }
 
 fn reproduction(pokedex: &mut PokeDeck) {
@@ -183,45 +310,54 @@ fn reproduction(pokedex: &mut PokeDeck) {
         return;
     }
     println!("Sélectionnez deux Pokémon à reproduire en entrant leurs IDs :");
-
-    println!("Sélectionnez le premier Pokémon :");
     pokedex.afficher_pokemons();
+    println!("Sélectionnez le premier Pokémon :");
     let mut id1_input = String::new();
     std::io::stdin()
         .read_line(&mut id1_input)
         .expect("Erreur de lecture");
-    let id1 = id1_input.trim().parse::<Uuid>().expect("ID invalide");
-    let poke1 = pokedex
-        .pokemons
-        .iter()
-        .find(|&p| p.id == id1)
-        .expect("Pokémon non trouvé")
-        .clone();
-
+    let id1 = match id1_input.trim().parse::<Uuid>() {
+        Ok(id) => id,
+        Err(_) => {
+            println!("ID invalide!");
+            return;
+        }
+    };
+    
+    let poke1 = match pokedex.pokemons.iter().find(|&p| p.id == id1) {
+        Some(p) => p.clone(),
+        None => {
+            println!("Pokémon non trouvé!");
+            return;
+        }
+    };
 
     println!("Sélectionnez le deuxième Pokémon :");
-    pokedex.afficher_pokemons();
     let mut id2_input = String::new();
     std::io::stdin()
         .read_line(&mut id2_input)
         .expect("Erreur de lecture");
-    let id2 = id2_input.trim().parse::<Uuid>().expect("ID invalide");
-    let poke2 = pokedex
-        .pokemons
-        .iter()
-        .find(|&p| p.id == id2)
-        .expect("Pokémon non trouvé")
-        .clone();
-
+    let id2 = match id2_input.trim().parse::<Uuid>() {
+        Ok(id) => id,
+        Err(_) => {
+            println!("ID invalide!");
+            return;
+        }
+    };
+    
+    let poke2 = match pokedex.pokemons.iter().find(|&p| p.id == id2) {
+        Some(p) => p.clone(),
+        None => {
+            println!("Pokémon non trouvé!");
+            return;
+        }
+    };
 
     println!("Vous avez sélectionné :");
     poke1.afficher();
     poke2.afficher();
 
     pokedex.reproduire(&poke1, &poke2);
-
-
-
 }
 
 fn main() {
@@ -236,7 +372,6 @@ fn main() {
     while continue_game {
         afficher_menu();
         
-
         let mut choix = String::new();
         std::io::stdin()
             .read_line(&mut choix)
@@ -253,20 +388,52 @@ fn main() {
             }
             "3" => {
                 println!("Vos pokémons sont partis pour l'entrainement !");
-                pokedex.entrainer_pokemons( rand::thread_rng().gen_range(20..=100));
+                pokedex.entrainer_pokemons(rand::thread_rng().gen_range(20..=100));
                 println!("Entraînement terminé ! Verifiez vos pokémons, ils ont gagné de l'expérience et peut-être meme un niveau !");
                 pokedex.afficher_pokemons();
-              
             }
             "4" => {
                 reproduction(&mut pokedex);
             }
-            "5" =>{
+            "5" => {
+                println!("Tri des Pokémon par niveau (décroissant)...");
+                pokedex.trier_par_niveau();
+                println!("Pokémon triés par niveau :");
+                pokedex.afficher_pokemons();
+            }
+            "6" => {
+                println!("Tri des Pokémon par type...");
+                pokedex.trier_par_type();
+                println!("Pokémon triés par type :");
+                pokedex.afficher_pokemons();
+            }
+            "7" => {
+                print!("Nom du fichier pour la sauvegarde: ");
+                io::stdout().flush().unwrap();
+                let mut fichier = String::new();
+                io::stdin().read_line(&mut fichier).expect("Erreur de lecture");
+                let fichier = fichier.trim();
+                
+                if let Err(err) = pokedex.sauvegarder(fichier) {
+                    println!("Erreur lors de la sauvegarde: {}", err);
+                }
+            }
+            "8" => {
+                print!("Nom du fichier à charger: ");
+                io::stdout().flush().unwrap();
+                let mut fichier = String::new();
+                io::stdin().read_line(&mut fichier).expect("Erreur de lecture");
+                let fichier = fichier.trim();
+                
+                if let Err(err) = pokedex.charger(fichier) {
+                    println!("Erreur lors du chargement: {}", err);
+                }
+            }
+            "9" => {
                 println!("Au revoir !");
                 continue_game = false;                
             }
             _ => println!("Choix invalide !"),
         }
-        
     }
 }
