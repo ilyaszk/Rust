@@ -1,0 +1,9 @@
+[package]
+name = "tp-email"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+lettre = "0.10.4"
+dotenv = "0.15.0"
+thiserror = "1.0"
